@@ -335,38 +335,99 @@ async def api_status():
     }
 
 
+# ---- 도서 추출 헬퍼 ----
+
+def _regex_extract_books(text: str) -> list[dict]:
+    """
+    정규식으로 도서 제목·저자 추출 (Gemini 폴백용).
+    지원 형식:
+      • 『제목』 / 저자 지음
+      • **제목** / 저자 지음
+      • 제목 / 저자 지음, 출판사  (줄바꿈 또는 •로 구분)
+      • 제목 : 부제 / 저자 지음, 출판사, 년도  (국립중앙도서관 Q&A 형식)
+    """
+    books: list[dict] = []
+    seen: set[str] = set()
+
+    # 1) 『제목』 패턴 (문서 전체에서)
+    for m in re.finditer(r'[『「]([^』」]{2,50})[』」]\s*/?\s*([^,\n/]{2,25})\s*(?:지음|저|글|저자)', text):
+        title = m.group(1).strip()
+        author = m.group(2).strip()
+        key = title[:20].lower()
+        if key not in seen and 2 <= len(title) <= 60:
+            seen.add(key)
+            books.append({"title": title, "author": author})
+
+    # 2) **제목** 패턴
+    for m in re.finditer(r'\*\*([^*]{2,50})\*\*\s*/\s*([^,\n/]{2,25})\s*(?:지음|저|글)', text):
+        title = m.group(1).strip()
+        author = m.group(2).strip()
+        key = title[:20].lower()
+        if key not in seen and 2 <= len(title) <= 60:
+            seen.add(key)
+            books.append({"title": title, "author": author})
+
+    # 3) "제목 / 저자 지음" 패턴 — 먼저 텍스트를 •와 줄바꿈으로 분절 후 각각 처리
+    segments = re.split(r'[•\n]', text)
+    pat = re.compile(r'^\s*([^/]{4,60}?)\s*/\s*([^,;/]{2,30})\s+(?:지음|저|글)')
+    for seg in segments:
+        seg = seg.strip().lstrip('·■*- ').strip()
+        m = pat.match(seg)
+        if m:
+            title = m.group(1).strip()
+            author = m.group(2).strip()
+            # 출처/URL/숫자 제외
+            if 'http' in title or '[' in title or len(title) < 2 or len(title) > 60:
+                continue
+            key = title[:20].lower()
+            if key not in seen:
+                seen.add(key)
+                books.append({"title": title, "author": author})
+
+    return books[:6]
+
+
 # ---- 도서 추출 엔드포인트 ----
 
 @app.post("/api/books-from-answer")
 async def extract_books(req: BookExtractRequest):
-    """AI 답변 텍스트에서 언급된 도서 제목·저자 추출 (Gemini)"""
+    """AI 답변 텍스트에서 언급된 도서 제목·저자 추출.
+    1순위: Gemini  /  폴백: 정규식 파싱 (할당량 초과 시)
+    """
     if not req.answer.strip() or len(req.answer) < 20:
         return {"books": []}
 
-    prompt = (
-        "다음 도서관 사서 답변에서 언급된 구체적인 도서(책) 제목과 저자를 추출하세요.\n"
-        "도서가 없거나 불분명하면 빈 배열을 반환하세요.\n"
-        "반드시 JSON 배열만 반환하세요. 다른 텍스트 없이:\n"
-        "[{\"title\": \"제목\", \"author\": \"저자명\"}]\n\n"
-        f"[답변]\n{req.answer[:2000]}"
-    )
-
+    # 1) Gemini 시도
     try:
+        prompt = (
+            "다음 도서관 사서 답변에서 언급된 구체적인 도서(책) 제목과 저자를 추출하세요.\n"
+            "도서가 없거나 불분명하면 빈 배열을 반환하세요.\n"
+            "반드시 JSON 배열만 반환하세요. 다른 텍스트 없이:\n"
+            "[{\"title\": \"제목\", \"author\": \"저자명\"}]\n\n"
+            f"[답변]\n{req.answer[:2000]}"
+        )
         resp = ai.models.generate_content(model=MODEL, contents=prompt)
         raw = (resp.text or "").strip()
-        # 마크다운 코드블록 제거
         raw = re.sub(r"```(?:json)?\n?", "", raw).replace("```", "").strip()
         data = json.loads(raw)
-        # dict 형태로 감싸진 경우 처리
         if isinstance(data, dict):
             data = data.get("books", data.get("data", []))
-        if not isinstance(data, list):
-            return {"books": []}
-        # title 있는 항목만, 최대 6권
-        books = [b for b in data if isinstance(b, dict) and b.get("title")][:6]
-        return {"books": books}
-    except Exception:
-        return {"books": []}
+        if isinstance(data, list):
+            books = [b for b in data if isinstance(b, dict) and b.get("title")][:6]
+            if books:
+                print(f"[books] Gemini {len(books)}권", flush=True)
+                return {"books": books}
+    except Exception as e:
+        err = str(e)
+        if "429" in err or "RESOURCE_EXHAUSTED" in err:
+            print("[books] Gemini 할당량 초과 → 정규식 폴백", flush=True)
+        else:
+            print(f"[books] Gemini 오류: {e}", flush=True)
+
+    # 2) 정규식 폴백
+    books = _regex_extract_books(req.answer)
+    print(f"[books] 정규식 {len(books)}권", flush=True)
+    return {"books": books}
 
 
 # ---- 검색 엔드포인트 ----
