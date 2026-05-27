@@ -8,5 +8,5 @@ cur.execute("SELECT COUNT(*) FROM qa_records WHERE morphemes IS NULL")
 null = cur.fetchone()[0]
 conn.close()
 with open("status_result.txt", "w") as f:
-    f.write(f"done={done}\nnull={null}\ntotal=5907\npct={done/5907*100:.1f}\n")
+    f.write(f"done={done}\nnull={null}\ntotal=5910\npct={done/5910*100:.1f}\n")
 print(f"done={done} null={null}")
