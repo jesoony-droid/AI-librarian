@@ -1,0 +1,22 @@
+# Phase 1 — 크롤링
+requests==2.32.3
+beautifulsoup4==4.14.3
+lxml>=5.0
+
+# Phase 2 — DB + 임베딩
+psycopg2-binary==2.9.12
+pgvector==0.4.2
+sentence-transformers==5.5.0
+# openai==2.36.0  # OpenAI 임베딩 사용 시 (크레딧 필요)
+
+# Phase 3 — 검색
+rank-bm25==0.2.2
+numpy==2.4.4
+
+# Phase 4 — Claude API
+anthropic==0.101.0
+
+# Phase 5 — 백엔드
+fastapi==0.136.1
+uvicorn==0.46.0
+python-dotenv==1.2.2

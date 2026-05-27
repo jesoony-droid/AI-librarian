@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 가상환경
+venv/
+.venv/
+env/
+.env_backup
+
+# 환경변수 (API 키 보호)
+.env
+
+# 데이터 / 모델 캐시
+*.bin
+*.pkl
+*.pt
+*.ckpt
+sentence_transformers_cache/
+.cache/
+huggingface/
+
+# 로그
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# 문서 원본 (HWP, PDF 등 대용량)
+*.hwpx
+*.hwp
+*.pdf
+
+# 임시 파일
+*.tmp
+*.bak
+clean_check*.txt
+embed_*.txt
+reclean_*.txt
+sample_check*.txt

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>AI 사서 응답시스템 개발 보고서</title>
+<style>
+/* ── 색상 팔레트 ──────────────────────────────────────
+   Navy  : #0d2b4e / #1a4a7a / #2563a8  (기본 계열)
+   Teal  : #0891b2 / #e0f7fa            (필요성·강조)
+   Amber : #b45309 / #fff8e1            (단점·경고)
+────────────────────────────────────────────────────── */
+
+@page {
+  size: A4 landscape;
+  margin: 15mm 18mm 20mm 18mm;
+  @bottom-left {
+    content: "국립중앙도서관 Q&A 기반 RAG 시스템  |  문헌정보학과 대학원  |  디지털도서관특강";
+    font-size: 9.5px; color: #8a9ab0; font-family: 'Malgun Gothic', sans-serif;
+  }
+  @bottom-right {
+    content: counter(page);
+    font-size: 9.5px; color: #8a9ab0; font-family: 'Malgun Gothic', sans-serif;
+  }
+}
+@page cover { margin:0; @bottom-left{content:none;} @bottom-right{content:none;} }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; font-size: 12.5pt; color: #1a1a2e; line-height: 1.85; }
+
+/* ══════════════════════════════════════════
+   표지 — 가로형 2컬럼 레이아웃
+══════════════════════════════════════════ */
+.cover {
+  page: cover;
+  background: #0d2b4e;
+  color: #fff;
+  width: 297mm; height: 210mm;
+  padding: 26px 32px 18px;
+  display: flex; flex-direction: column;
+  page-break-after: always;
+}
+
+/* 헤더: 전체 너비 */
+.cv-header { margin-bottom: 16px; }
+.cv-badge {
+  display: inline-block;
+  border: 1px solid #2563a8; border-radius: 20px;
+  padding: 3px 14px; font-size: 9pt; color: #90c4f0; letter-spacing: .05em;
+  margin-bottom: 8px; width: fit-content;
+}
+.cv-title { font-size: 26pt; font-weight: 700; line-height: 1.2; margin-bottom: 5px; }
+.cv-sub   { font-size: 11pt; color: #90c4f0; margin-bottom: 2px; }
+.cv-date  { font-size: 9pt; color: #5a8abf; }
+
+/* 본문: 좌/우 2컬럼 */
+.cv-body { display: flex; gap: 26px; flex: 1; min-height: 0; }
+
+/* 좌 컬럼: 통계 */
+.cv-left { width: 36%; display: flex; flex-direction: column; gap: 6px; }
+.stat-row-v { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.stat-box-v {
+  background: #1a3d6e; border-radius: 7px;
+  padding: 7px 12px; flex: 1;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.stat-v-lbl { font-size: 9pt; color: #90c4f0; }
+.stat-v-num { font-size: 13pt; font-weight: 700; color: #fff; text-align: right; }
+.stat-v-num.teal { color: #38bdf8; }
+
+/* 우 컬럼: 데이터 + 타임라인 + 성과 + 기술 */
+.cv-right { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+
+.cv-sec-title {
+  font-size: 8.5pt; font-weight: 700; letter-spacing: .06em;
+  color: #0891b2; text-transform: uppercase; margin-bottom: 5px;
+}
+
+/* 두 데이터 테이블 나란히 */
+.cv-data-row { display: flex; gap: 18px; }
+.cv-data-col { flex: 1; }
+
+/* div 기반 테이블 */
+.cv-table { width: 100%; font-size: 9.5pt; }
+.cv-row   { display: flex; padding: 4px 0; }
+.cv-row.head { border-bottom: 1px solid #1a3d6e; margin-bottom: 2px; }
+.cv-row.head .cv-cell { color: #5a8abf; font-size: 8.5pt; font-weight: 600; }
+.cv-cell  { flex: 1; color: #c8dff5; }
+.cv-cell.num  { text-align: right; font-weight: 700; color: #fff; }
+.cv-cell.teal { text-align: right; font-weight: 700; color: #38bdf8; }
+.cv-cell.alt  { color: #90c4f0; }
+.cv-note  { font-size: 7.5pt; color: #3a6a9a; margin-top: 3px; }
+
+/* 타임라인 */
+.phase-row { display: flex; align-items: center; }
+.ph-item { text-align: center; flex: 1; }
+.ph-dot  {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #1a3d6e; font-weight: 700; font-size: 8pt; color: #fff;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 3px;
+}
+.ph-line { height: 2px; background: #1a3d6e; flex: 1; margin-bottom: 18px; }
+.ph-name { font-size: 7pt; color: #5a8abf; }
+
+/* 성과 요약 뱃지 */
+.summary-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+.sum-item {
+  background: #1a4a7a; border-radius: 4px;
+  padding: 4px 11px; font-size: 8.5pt; font-weight: 600; color: #e0f0ff;
+}
+
+/* 기술스택 뱃지 */
+.tech-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+.tech-badge {
+  background: #0891b2; border-radius: 4px;
+  padding: 4px 11px; font-size: 8.5pt; font-weight: 700; color: #fff;
+}
+
+/* 푸터 */
+.cv-footer { font-size: 8pt; color: #3a6a9a; text-align: center; padding-top: 8px; margin-top: 6px; }
+
+
+/* ══════════════════════════════════════════
+   본문 공통
+══════════════════════════════════════════ */
+.page-title {
+  font-size: 10.5pt; font-weight: 700; color: #2563a8;
+  letter-spacing: .04em; padding-bottom: 5px;
+  border-bottom: 2px solid #2563a8; margin-bottom: 18px;
+}
+h2 {
+  font-size: 16pt; font-weight: 700; color: #0d2b4e;
+  margin: 22px 0 12px; padding-left: 12px;
+  border-left: 4px solid #2563a8;
+}
+h3 { font-size: 14pt; font-weight: 700; color: #2563a8; margin: 16px 0 8px; }
+h4 { font-size: 12.5pt; font-weight: 700; color: #0d2b4e; margin: 12px 0 5px; }
+p  { margin-bottom: 8px; }
+
+.page-break { page-break-before: always; }
+
+/* 본문 테이블 */
+table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 12pt; }
+th { background: #dbeafe; color: #0d2b4e; font-weight: 700; padding: 7px 10px; border: 1px solid #bfdbfe; text-align: left; }
+td { padding: 7px 10px; border: 1px solid #dbeafe; vertical-align: top; }
+tr:nth-child(even) td { background: #f0f7ff; }
+.td-ok  { color: #0f766e; font-weight: 700; }
+.td-imp { color: #1d4ed8; font-weight: 700; }
+.td-new { color: #7c3aed; font-weight: 700; }
+
+/* 코드/인라인 */
+.code-box {
+  background: #1e1e2e; color: #cdd6f4;
+  border-radius: 6px; padding: 12px 16px;
+  font-size: 10.5pt; line-height: 1.6; margin: 10px 0;
+  font-family: 'Consolas', monospace; white-space: pre-wrap;
+}
+code {
+  background: #dbeafe; border: 1px solid #bfdbfe; border-radius: 3px;
+  padding: 1px 5px; font-size: 10pt; font-family: 'Consolas', monospace;
+}
+
+/* 정보 박스 */
+.info-box {
+  background: #eff6ff; border: 1px solid #bfdbfe;
+  border-left: 4px solid #2563a8;
+  border-radius: 5px; padding: 10px 14px; margin: 10px 0;
+}
+.new-box {
+  background: #e0f7fa; border: 1px solid #80deea;
+  border-left: 4px solid #0891b2;
+  border-radius: 5px; padding: 10px 14px; margin: 10px 0;
+}
+
+/* 오류 블록 */
+.err-block {
+  border: 1px solid #dbeafe; border-radius: 7px;
+  padding: 11px 14px; margin: 10px 0; page-break-inside: avoid;
+}
+.err-block h4 { margin-top: 0; }
+.err-lbl { font-weight: 700; color: #0d2b4e; }
+
+/* ── 6·7섹션 플랜 블록 ─────────────────────────── */
+.plan-block { margin: 14px 0; page-break-inside: avoid; }
+.plan-head  {
+  font-size: 12pt; font-weight: 700; color: #0d2b4e;
+  margin-bottom: 6px;
+}
+.plan-point {
+  font-size: 11.5pt; color: #1a4a7a;
+  margin-bottom: 6px; padding-left: 14px;
+}
+
+/* 필요성 박스 — 틸 계열 */
+.need-box {
+  background: #e0f7fa;
+  border-left: 4px solid #0891b2;
+  border-radius: 0 5px 5px 0;
+  padding: 8px 14px; margin: 5px 0 5px 14px;
+  font-size: 11pt; color: #0d3d52;
+}
+.need-box strong { color: #0891b2; }
+
+/* 단점 박스 — 앰버 계열 */
+.con-box {
+  background: #fff8e1;
+  border-left: 4px solid #b45309;
+  border-radius: 0 5px 5px 0;
+  padding: 8px 14px; margin: 5px 0 5px 14px;
+  font-size: 11pt; color: #4a2b00;
+}
+.con-box strong { color: #b45309; }
+
+/* 배지 */
+.badge { display: inline-block; border-radius: 3px; padding: 1px 7px; font-size: 9pt; font-weight: 700; margin-left: 5px; vertical-align: middle; }
+.badge-new  { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.badge-fix  { background: #fff8e1; color: #b45309; border: 1px solid #fcd34d; }
+.badge-done { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+
+ul, ol { padding-left: 18px; margin: 6px 0; }
+li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     표지
+══════════════════════════════════════════ -->
+<div class="cover">
+
+  <!-- ① 헤더: 전체 너비 -->
+  <div class="cv-header">
+    <div class="cv-badge">문헌정보학과 대학원 · 디지털도서관특강</div>
+    <div class="cv-title">AI 사서 응답시스템&nbsp;&nbsp;개발 보고서</div>
+    <div class="cv-sub">국립중앙도서관 Q&amp;A 기반 RAG 시스템 구축 과정 및 운영 계획</div>
+    <div class="cv-date">문헌정보학과 대학원&nbsp;&nbsp;|&nbsp;&nbsp;디지털도서관특강&nbsp;&nbsp;|&nbsp;&nbsp;2026. 05. 18. 발표</div>
+  </div>
+
+  <!-- ② 본문: 좌/우 2컬럼 -->
+  <div class="cv-body">
+
+    <!-- 좌: 통계 7개 (세로 배치) -->
+    <div class="cv-left">
+      <div class="cv-sec-title">▸ 주요 지표</div>
+      <div class="stat-row-v">
+        <div class="stat-box-v"><span class="stat-v-lbl">수집 Q&amp;A</span><span class="stat-v-num">5,910건</span></div>
+        <div class="stat-box-v"><span class="stat-v-lbl">임베딩 완료</span><span class="stat-v-num">5,910건</span></div>
+        <div class="stat-box-v"><span class="stat-v-lbl">수집 성공률</span><span class="stat-v-num">100%</span></div>
+        <div class="stat-box-v"><span class="stat-v-lbl">해결된 오류</span><span class="stat-v-num">11건</span></div>
+        <div class="stat-box-v"><span class="stat-v-lbl">임베딩 비용</span><span class="stat-v-num">0원</span></div>
+        <div class="stat-box-v"><span class="stat-v-lbl">검색 방식</span><span class="stat-v-num teal">RRF Hybrid</span></div>
+        <div class="stat-box-v"><span class="stat-v-lbl">AI 모델</span><span class="stat-v-num teal">Gemini 2.5</span></div>
+      </div>
+    </div>
+
+    <!-- 우: 데이터 + 타임라인 + 성과 + 기술 -->
+    <div class="cv-right">
+
+      <!-- 두 테이블 나란히 -->
+      <div class="cv-data-row">
+        <div class="cv-data-col">
+          <div class="cv-sec-title">▸ 데이터 수집 현황</div>
+          <div class="cv-table">
+            <div class="cv-row head"><div class="cv-cell">항목</div><div class="cv-cell num">건수</div></div>
+            <div class="cv-row"><div class="cv-cell alt">수집 대상</div><div class="cv-cell num">5,910</div></div>
+            <div class="cv-row"><div class="cv-cell alt">수집 완료</div><div class="cv-cell num">5,910</div></div>
+            <div class="cv-row"><div class="cv-cell alt">임베딩 완료</div><div class="cv-cell num">5,910</div></div>
+            <div class="cv-row"><div class="cv-cell alt">파싱 오류(제외)</div><div class="cv-cell num">0</div></div>
+          </div>
+          <div class="cv-note">* 기존 3건 lxml 파서 전환으로 완전 수집</div>
+        </div>
+        <div class="cv-data-col">
+          <div class="cv-sec-title">▸ 검색 방식 비중 (RRF 하이브리드)</div>
+          <div class="cv-table">
+            <div class="cv-row head"><div class="cv-cell">쿼리 유형</div><div class="cv-cell num">BM25</div><div class="cv-cell teal">벡터</div></div>
+            <div class="cv-row"><div class="cv-cell alt">기본 (일반 질문)</div><div class="cv-cell num">35%</div><div class="cv-cell teal">65%</div></div>
+            <div class="cv-row"><div class="cv-cell alt">주제 탐색형</div><div class="cv-cell num">20%</div><div class="cv-cell teal">80%</div></div>
+            <div class="cv-row"><div class="cv-cell alt">고유명사/ISBN</div><div class="cv-cell num">70%</div><div class="cv-cell teal">30%</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 타임라인 -->
+      <div>
+        <div class="cv-sec-title">▸ 개발 단계 타임라인</div>
+        <div class="phase-row">
+          <div class="ph-item"><div class="ph-dot">1</div><div class="ph-name">기획/설계</div></div>
+          <div class="ph-line"></div>
+          <div class="ph-item"><div class="ph-dot">2</div><div class="ph-name">데이터수집</div></div>
+          <div class="ph-line"></div>
+          <div class="ph-item"><div class="ph-dot">3</div><div class="ph-name">DB/임베딩</div></div>
+          <div class="ph-line"></div>
+          <div class="ph-item"><div class="ph-dot">4</div><div class="ph-name">검색구현</div></div>
+          <div class="ph-line"></div>
+          <div class="ph-item"><div class="ph-dot">5</div><div class="ph-name">API/UI</div></div>
+          <div class="ph-line"></div>
+          <div class="ph-item"><div class="ph-dot">6</div><div class="ph-name">Gemini통합</div></div>
+          <div class="ph-line"></div>
+          <div class="ph-item"><div class="ph-dot">+</div><div class="ph-name">앱 통합</div></div>
+        </div>
+      </div>
+
+      <!-- 최종 성과 요약 -->
+      <div>
+        <div class="cv-sec-title">▸ 최종 성과 요약</div>
+        <div class="summary-grid">
+          <span class="sum-item">수집 데이터: 5,910건 (100% 완전 수집)</span>
+          <span class="sum-item">DB: PostgreSQL + pgvector, 384차원 임베딩</span>
+          <span class="sum-item">검색: RRF 하이브리드 (BM25 35% + 벡터 65%)</span>
+          <span class="sum-item">AI 답변: Gemini 2.5 Flash 스트리밍 + 출처 URL</span>
+          <span class="sum-item">ReadRhythm 앱 통합 (🤖 AI사서 탭)</span>
+          <span class="sum-item">임베딩 비용: 0원 (로컬 무료 모델)</span>
+          <span class="sum-item">무결과 시 유사 질문 3개 자동 제안</span>
+          <span class="sum-item">외부 공개: ngrok HTTPS URL 스마트폰 시연</span>
+        </div>
+      </div>
+
+      <!-- 기술 스택 -->
+      <div>
+        <div class="cv-sec-title">▸ 기술 스택</div>
+        <div class="tech-wrap">
+          <span class="tech-badge">Python 3.14</span>
+          <span class="tech-badge">FastAPI</span>
+          <span class="tech-badge">PostgreSQL 17</span>
+          <span class="tech-badge">pgvector</span>
+          <span class="tech-badge">Gemini 2.5 Flash</span>
+          <span class="tech-badge">google.genai SDK</span>
+          <span class="tech-badge">sentence-transformers</span>
+          <span class="tech-badge">RRF 하이브리드 검색</span>
+        </div>
+      </div>
+
+    </div><!-- /.cv-right -->
+  </div><!-- /.cv-body -->
+
+  <!-- ③ 푸터 -->
+  <div class="cv-footer">
+    작성일: 2026년 5월 15일&nbsp;&nbsp;|&nbsp;&nbsp;최종 업데이트: 2026년 5월 17일&nbsp;&nbsp;|&nbsp;&nbsp;발표일: 2026년 5월 18일&nbsp;&nbsp;|&nbsp;&nbsp;본 보고서는 Claude Code(AI)와 협업하여 작성되었습니다.
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     1. 프로젝트 개요
+══════════════════════════════════════════ -->
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+<h2>1. 프로젝트 개요</h2>
+
+<h3>1.1 배경 및 목적</h3>
+<p>국립중앙도서관은 '사서문답' 서비스를 통해 이용자 질문에 전문 사서가 직접 답변하는 Q&amp;A 데이터를 5,900건 이상 축적하고 있습니다. 그러나 이 데이터가 검색 가능한 형태로 체계화되지 않아 이용자가 원하는 정보를 효율적으로 찾기 어려운 상황이었습니다.</p>
+<p>본 프로젝트는 이 Q&amp;A 데이터를 RAG(Retrieval-Augmented Generation) 방식으로 구조화하여, 자연어 질문 입력 시 유사 Q&amp;A를 자동 검색하고 Gemini AI가 이를 바탕으로 답변을 생성하는 AI 사서 응답시스템을 구축하는 것을 목표로 합니다.</p>
+
+<h3>1.2 시스템 동작 흐름</h3>
+<table>
+  <tr><th>단계</th><th>내용</th></tr>
+  <tr><td>이용자 질문 입력</td><td>브라우저 웹 UI / ReadRhythm 앱 AI사서 탭</td></tr>
+  <tr><td>FastAPI 서버 처리</td><td>/api/ask 엔드포인트</td></tr>
+  <tr><td>하이브리드 검색</td><td>BM25(35%) + 벡터 유사도(65%) → RRF 통합</td></tr>
+  <tr><td>상위 5건 컨텍스트 구성</td><td>질문 + 답변 + 출처 URL</td></tr>
+  <tr><td>Gemini 2.5 Flash 호출</td><td>스트리밍 방식으로 실시간 답변 생성</td></tr>
+  <tr><td>이용자에게 전달</td><td>AI 답변 + 참고 출처 URL 표시</td></tr>
+</table>
+
+<h3>1.3 기술 스택 선정 이유</h3>
+<table>
+  <tr><th>기술</th><th>선정 이유</th></tr>
+  <tr><td>PostgreSQL 17 + pgvector</td><td>벡터 검색과 전문검색을 단일 DB로 통합 → 인프라 단순화</td></tr>
+  <tr><td>paraphrase-multilingual-MiniLM</td><td>무료 로컬 실행, 다국어(한국어) 지원, 384차원</td></tr>
+  <tr><td>Gemini 2.5 Flash</td><td>무료 tier 제공, 한국어 고품질 응답, 스트리밍 지원</td></tr>
+  <tr><td>google.genai SDK</td><td>기존 google.generativeai deprecated → 최신 공식 SDK</td></tr>
+  <tr><td>FastAPI</td><td>비동기 StreamingResponse 지원, 자동 API 문서 생성</td></tr>
+  <tr><td>RRF 하이브리드 검색</td><td>키워드 정확도 + 의미 유사도 결합으로 검색 품질 향상</td></tr>
+</table>
+
+
+<!-- ══════════════════════════════════════════
+     2. 개발 단계별 진행 과정
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+<h2>2. 개발 단계별 진행 과정</h2>
+
+<h3>Phase 1 — 기획 및 설계</h3>
+<p>초기에는 OpenAI GPT-4 + text-embedding-ada-002 조합을 계획하였으나 API 크레딧 부족으로 대안을 마련하였습니다. 임베딩은 Hugging Face 무료 로컬 모델(sentence-transformers)로, AI 답변은 Google Gemini 무료 tier로 전환하여 전체 시스템을 비용 0원으로 설계하였습니다.</p>
+<div class="info-box">
+  <strong>핵심 설계 결정</strong><br>
+  · 임베딩: 유료 API 대신 로컬 sentence-transformers → 비용 0원, 인터넷 불필요<br>
+  · 검색: 키워드 단독이 아닌 BM25+벡터 하이브리드 방식 → 정확도 향상<br>
+  · AI 답변: Gemini 무료 tier 활용 → 운영 비용 최소화<br>
+  · DB: PostgreSQL 하나로 전문검색+벡터 검색 통합 → 인프라 단순화
+</div>
+
+<h3>Phase 2 — 데이터 수집 (크롤링)</h3>
+<p>국립중앙도서관 사서문답 서비스에서 591페이지 × 10건 = 5,910건을 수집 대상으로 설정하고 자동 크롤러를 개발하였습니다. 초기에는 HTML 엔티티 파싱 오류로 3건이 누락되었으나, lxml 파서 전환으로 최종 <strong>5,910건 전체를 완전 수집</strong>하였습니다.</p>
+<table>
+  <tr><th>항목</th><th>내용</th></tr>
+  <tr><td>수집 대상</td><td>국립중앙도서관 사서문답 서비스 (nl.go.kr)</td></tr>
+  <tr><td>수집 필드</td><td>질문, 답변, 도서관명, 카테고리, 조회수, 출처 URL, 키(ackRecKey)</td></tr>
+  <tr><td>최종 수집량</td><td><strong>5,910건 (100%)</strong> <span class="badge badge-fix">업데이트</span></td></tr>
+  <tr><td>제외 건수</td><td>0건 (기존 3건 → lxml 파서 전환으로 완전 수집)</td></tr>
+</table>
+
+<h3>Phase 3 — DB 구축 및 임베딩</h3>
+<p>PostgreSQL 17에 pgvector 확장을 설치하여 벡터 저장 및 코사인 유사도 검색 환경을 구축하였습니다. paraphrase-multilingual-MiniLM-L12-v2 모델로 각 Q&amp;A의 질문+답변 텍스트를 384차원 벡터로 변환하여 저장하였습니다. <strong>5,910건 전체 임베딩 완료</strong> 후 IVFFlat 인덱스를 생성하여 검색 속도를 최적화하였습니다.</p>
+
+<h3>Phase 4 — 하이브리드 검색 구현</h3>
+<table>
+  <tr><th>쿼리 유형</th><th>BM25 비중</th><th>벡터 비중</th><th>판별 조건</th></tr>
+  <tr><td>기본 (기본값)</td><td>35%</td><td>65%</td><td>기타 모든 질문</td></tr>
+  <tr><td>주제 탐색형</td><td>20%</td><td>80%</td><td>'주제', '관련', '추천' 등 포함</td></tr>
+  <tr><td>고유명사형</td><td>70%</td><td>30%</td><td>ISBN, 저자명, 출판사 등 포함</td></tr>
+</table>
+
+<div class="info-box">
+  <strong>가중치 설계 근거</strong><br><br>
+
+  <strong>① 기본값: BM25 35% + 벡터 65%</strong><br>
+  국립중앙도서관 사서문답 Q&amp;A의 대부분은 <em>"대출 연장은 어떻게 하나요"</em>, <em>"청구기호 읽는 방법"</em>처럼
+  특정 키워드보다 <strong>질문의 의도·맥락</strong>이 중요한 개념·절차형 질문입니다.
+  벡터 검색은 표현이 달라도 의미가 같은 문장을 잘 찾는 반면, BM25는 동일 단어가 없으면 관련 문서를 놓칩니다.
+  따라서 의미 유사도(벡터)에 더 높은 비중을 두되, 특정 용어가 포함된 질문에도 대응할 수 있도록 BM25를 35% 보완합니다.<br>
+  <em>→ 왜 70%나 60%가 아닌 65%인가:</em> BM25를 35% 유지해야 '청구기호', '소장', '사서' 등 도서관 전문 용어처럼 표현 변이가 적은 단어에서 정밀도를 확보할 수 있습니다. 완전한 벡터 중심으로 가면 범용 다국어 임베딩 모델의 특성상 전문 용어에서 유사도 오차가 발생할 수 있어, 65%를 두 방식의 균형점으로 설정하였습니다. 향후 실사용 쿼리 로그를 수집하면 그리드 서치로 최적값을 정밀화할 수 있습니다.<br><br>
+
+  <strong>② 고유명사형: BM25 70% + 벡터 30%</strong><br>
+  ISBN, 저자명, 출판사처럼 <strong>고유명사·식별자</strong>가 포함된 질문은 정확한 토큰 일치가 핵심입니다.
+  벡터 임베딩 모델은 고유명사를 의미 공간에서 일반화하는 경향이 있어, 특정 저자명이 비슷한 장르의 다른 저자와 가깝게 매핑될 수 있습니다.
+  반면 BM25는 입력된 문자열을 그대로 토큰으로 비교하므로 고유명사 검색에 유리합니다.<br>
+  <em>→ 왜 80%나 100%가 아닌 70%인가:</em> 벡터 30%를 유지함으로써 해당 저자의 분야·장르와 관련된 문서를 의미적으로 보완 검색할 수 있습니다. BM25를 100%로 올리면 질문의 맥락과 의도를 완전히 무시하게 되어, 예를 들어 저자명 오기재 시 관련 결과를 전혀 찾지 못하는 취약점이 생깁니다. 70%는 정확도와 맥락 보완 사이의 실용적 균형점입니다.<br><br>
+
+  <strong>③ 주제 탐색형: BM25 20% + 벡터 80%</strong><br>
+  <em>"한국 현대문학 관련 자료 추천해줘"</em>처럼 <strong>넓은 주제 영역</strong>을 탐색하는 질문은
+  특정 키워드가 없어도 의미적으로 유사한 Q&amp;A를 최대한 많이 찾아야 합니다.
+  이 경우 벡터 검색의 시맨틱 커버리지가 가장 중요하므로 벡터 비중을 80%까지 높입니다.<br>
+  <em>→ 왜 90%가 아닌 80%인가:</em> 주제 탐색형 질문에도 '한국', '현대문학'처럼 BM25가 정확히 잡아야 할 핵심 키워드가 포함됩니다. BM25를 20% 유지하면 이런 키워드가 일치하는 문서에 가점이 가지만, 90%로 올리면 BM25 기여가 사실상 노이즈 수준으로 줄어 키워드 정밀도가 손실됩니다. 현 설계값은 합리적 시작점이며, 실사용 데이터 기반 최적화 여지를 남겨 두었습니다.
+</div>
+
+<h3>Phase 5 — FastAPI 서버 및 웹 UI</h3>
+<table>
+  <tr><th>엔드포인트</th><th>역할</th></tr>
+  <tr><td><code>GET  /</code></td><td>웹 UI 서빙 (frontend/index.html)</td></tr>
+  <tr><td><code>POST /api/search</code></td><td>하이브리드 검색 결과 JSON 반환 (AI 없음)</td></tr>
+  <tr><td><code>POST /api/ask</code></td><td>검색 + Gemini RAG 스트리밍 답변 생성</td></tr>
+</table>
+
+<h3>Phase 6 — Gemini AI 통합</h3>
+<p>처음에는 Anthropic Claude API를 계획하였으나 결제 화면 이슈로 Google Gemini API로 전환하였습니다. 전환 과정에서 코드가 Anthropic SDK와 google.generativeai 방식으로 혼재되는 문제가 발생하였으며, 이를 google.genai 최신 SDK로 완전히 재통합하였습니다. 모델은 gemini-2.5-flash를 최종 채택하였습니다.</p>
+
+
+<!-- ══════════════════════════════════════════
+     3. 발생 오류 및 해결 과정
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+<h2>3. 발생 오류 및 해결 과정</h2>
+<p>프로젝트 전 단계에 걸쳐 총 <strong>11건</strong>의 오류가 발생하였으며, 모두 해결하여 최종 시스템을 완성하였습니다.</p>
+
+<table>
+  <tr><th>#</th><th>오류명</th><th>발생 단계</th><th>핵심 원인</th><th>해결 방법</th></tr>
+  <tr><td>1</td><td>크롤러 파라미터 오류</td><td>Phase 2</td><td>pageNum → page 혼동</td><td>실제 파라미터 page로 수정</td></tr>
+  <tr><td>2</td><td>views 필드 파싱 오류</td><td>Phase 2</td><td>천단위 쉼표 int() 실패</td><td>.replace(",","") 추가</td></tr>
+  <tr><td>3</td><td>pgvector 설치 복잡성</td><td>Phase 3</td><td>Windows 빌드 복잡</td><td>사전 빌드 바이너리 수동 설치</td></tr>
+  <tr><td>4</td><td>Gemini 전환 코드 혼재</td><td>Phase 6</td><td>Anthropic+genai 혼재</td><td>generate() 함수 전체 재작성</td></tr>
+  <tr><td>5</td><td>패키지 미설치</td><td>Phase 6</td><td>google-generativeai 누락</td><td>pip install 후 requirements 추가</td></tr>
+  <tr><td>6</td><td>SDK deprecated 경고</td><td>Phase 6</td><td>google.generativeai 종료</td><td>google.genai 최신 SDK 전환</td></tr>
+  <tr><td>7</td><td>API 쿼터 초과 (429)</td><td>Phase 6</td><td>무료 tier 일일 한도 초과</td><td>gemini-2.5-flash + 신규 GCP 키</td></tr>
+  <tr><td>8</td><td>구버전 서버 잔류</td><td>배포/테스트</td><td>--reload 후 구버전 잔류</td><td>Stop-Process 전체 종료 후 재시작</td></tr>
+  <tr><td>9</td><td>한글 인코딩 오류</td><td>전체</td><td>CP949/UTF-8 불일치</td><td>stdout.reconfigure(encoding='utf-8')</td></tr>
+  <tr><td>10</td><td>HTML 엔티티 파싱 오류</td><td>Phase 2</td><td>&amp;#039 세미콜론 누락 → Python 3.14 ValueError</td><td>lxml 파서 전환 → 3건 완전 수집</td></tr>
+  <tr><td>11</td><td><strong>배치파일 인코딩 오류</strong> <span class="badge badge-new">신규</span></td><td>배포</td><td>UTF-8 .bat/.ps1을 cmd/PS가 CP949로 읽어 한글 명령어 파싱 실패 (3단계 반복)</td><td>PS1 UTF-8 BOM 저장 → 파일명 영문화 → %~dp0 상대경로로 최종 해결</td></tr>
+</table>
+
+<div class="err-block">
+  <h4>오류 1 — 크롤러 파라미터 오류</h4>
+  <p><span class="err-lbl">[문제]</span> 국립중앙도서관 목록 API 호출 시 페이지 파라미터를 pageNum으로 설정. 실제 API는 page 파라미터를 사용하여 매 요청이 1페이지만 반복 수집됨. 5,910건 수집 시도 중 동일한 10건이 591회 반복 저장되는 오류 발생.</p>
+  <p><span class="err-lbl">[해결]</span> 브라우저 개발자 도구로 실제 요청 파라미터를 확인하여 page로 수정. 수집 데이터 전체 삭제 후 재수집 진행.</p>
+</div>
+<div class="err-block">
+  <h4>오류 2 — views 필드 파싱 오류</h4>
+  <p><span class="err-lbl">[문제]</span> 조회수(views) 필드 값이 '1,234' 형태의 천단위 쉼표 포함 문자열로 수집됨. int('1,234') 변환 시 ValueError 발생, 해당 건 전체 DB 적재 실패.</p>
+  <p><span class="err-lbl">[해결]</span> int 변환 직전에 .replace(',', '') 전처리를 추가하여 쉼표 제거 후 변환.</p>
+</div>
+<div class="err-block">
+  <h4>오류 3 — pgvector 설치 복잡성 (Windows 환경)</h4>
+  <p><span class="err-lbl">[문제]</span> pgvector는 PostgreSQL C 확장으로, Windows에서는 Visual Studio Build Tools 및 PostgreSQL 개발 헤더 경로 설정 필요. 공식 문서대로 진행 시 nmake 빌드 오류 반복 발생.</p>
+  <p><span class="err-lbl">[해결]</span> GitHub Releases에서 Windows용 사전 빌드 바이너리를 다운로드. C:\Temp\pgvector_extract에 압축 해제 후 .dll/.control 파일을 PostgreSQL 설치 디렉터리에 수동 복사하여 CREATE EXTENSION vector 성공.</p>
+</div>
+<div class="err-block">
+  <h4>오류 4 — Gemini 전환 코드 혼재</h4>
+  <p><span class="err-lbl">[문제]</span> Claude → Gemini 전환 도중 작업이 중단되어 google.generativeai import와 Anthropic SDK 스타일 호출이 동일 파일 내 혼재. 서버 실행 시 AttributeError 발생, /api/ask 엔드포인트 응답 불가.</p>
+  <p><span class="err-lbl">[해결]</span> generate() 함수 전면 재작성. google.genai 최신 SDK의 client.models.generate_content_stream() 방식으로 교체.</p>
+</div>
+
+<div class="page-break"></div>
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+
+<div class="err-block">
+  <h4>오류 5 — 패키지 미설치</h4>
+  <p><span class="err-lbl">[문제]</span> google.generativeai 임포트 시 ModuleNotFoundError 발생. 가상환경 초기 설정 시 requirements.txt에 해당 패키지가 누락된 상태.</p>
+  <p><span class="err-lbl">[해결]</span> pip install google-generativeai 로 즉시 설치. 이후 requirements.txt에 추가하여 재현 방지.</p>
+</div>
+<div class="err-block">
+  <h4>오류 6 — SDK deprecated 경고</h4>
+  <p><span class="err-lbl">[문제]</span> google.generativeai 라이브러리가 공식 deprecated 처리됨. 일부 신규 모델 파라미터 미지원으로 향후 버전에서 완전 제거될 위험.</p>
+  <p><span class="err-lbl">[해결]</span> google.genai (google-genai 패키지) 최신 SDK로 전면 전환. Client 초기화 방식 및 스트리밍 호출 구조 전체 재작성 완료.</p>
+</div>
+<div class="err-block">
+  <h4>오류 7 — Gemini API 쿼터 초과 (429)</h4>
+  <p><span class="err-lbl">[문제]</span> gemini-2.0-flash 무료 tier 일일 요청 한도 초과로 RESOURCE_EXHAUSTED 오류 발생. 새 API 키를 발급해도 동일 GCP 프로젝트 내에서는 쿼터가 공유되어 동일 오류 반복.</p>
+  <p><span class="err-lbl">[해결]</span> gemini-2.5-flash 모델(별도 독립 쿼터)로 변경 + 신규 GCP 프로젝트에서 API 키 재발급. 쿼터 초과 시 검색 결과를 직접 반환하는 폴백 로직도 추가 구현.</p>
+</div>
+<div class="err-block">
+  <h4>오류 8 — 구버전 서버 프로세스 잔류</h4>
+  <p><span class="err-lbl">[문제]</span> uvicorn --reload 옵션으로 재시작 후에도 구버전 reloader 프로세스가 포트 8000 점유. 코드 수정이 전혀 반영되지 않아 /api/ask가 항상 동일 메시지만 반환.</p>
+  <p><span class="err-lbl">[해결]</span> Get-Process python* | Stop-Process -Force로 모든 Python 프로세스 강제 종료 후 --reload 없이 재시작. 운영 시 --reload 옵션 미사용 권장.</p>
+</div>
+<div class="err-block">
+  <h4>오류 9 — 한글 인코딩 출력 오류</h4>
+  <p><span class="err-lbl">[문제]</span> Windows 콘솔 기본 인코딩이 CP949인 환경에서 Python print()로 UTF-8 한글 출력 시 UnicodeEncodeError 발생.</p>
+  <p><span class="err-lbl">[해결]</span> sys.stdout.reconfigure(encoding='utf-8', errors='replace') 방식으로 해결.</p>
+</div>
+<div class="err-block">
+  <h4>오류 10 — HTML 엔티티 파싱 오류</h4>
+  <p><span class="err-lbl">[문제]</span> 일부 레코드(3건)의 HTML에 세미콜론이 누락된 불량 HTML 엔티티(<code>&amp;#039doopedia...</code>)가 포함. Python 3.14의 html.parser가 int() 변환 시 ValueError 발생. BeautifulSoup 객체 생성 단계에서 예외가 발생하여 기존 try-except로도 포착 불가.</p>
+  <p><span class="err-lbl">[해결]</span> <code>BeautifulSoup(html, "lxml")</code>으로 파서 전환. lxml은 불량 HTML에 관용적으로 처리하여 정상 파싱 가능. 누락 3건 완전 수집 → 총 <strong>5,910건 (100%)</strong> 달성.</p>
+</div>
+<div class="err-block" style="border-left: 3px solid #0891b2;">
+  <h4>오류 11 — 발표 자동실행 배치파일 인코딩 오류 <span class="badge badge-new">신규</span></h4>
+  <p><span class="err-lbl">[문제]</span> 발표 당일 서버·ngrok·Expo를 일괄 시작하는 <code>발표시작.bat</code>를 더블클릭하였으나 창이 나타났다 즉시 사라지고 아무것도 실행되지 않음. 원인 분석 결과, 배치 파일이 UTF-8 인코딩으로 저장되어 있었으나 Windows cmd.exe가 시스템 기본 코드페이지(CP949)로 파일을 읽으면서 한글 UTF-8 바이트 시퀀스가 명령어로 잘못 파싱됨. 예: <code>AI사서 FastAPI</code>의 한글 바이트 경계에서 문자열이 분리되어 <code>tAPI</code>가 독립 명령어로 인식되어 오류 발생. 같은 이유로 <code>발표시작.ps1</code> 전환 후에도 PowerShell 5.1이 BOM 없는 UTF-8 파일을 CP949로 읽어 한글 경로(<code>C:\VIBE\9. AI사서응답시스템</code>)가 깨져 <code>Start-Process -WorkingDirectory</code> 디렉터리 탐색 실패.</p>
+  <p><span class="err-lbl">[해결 1단계]</span> PowerShell의 <code>[System.IO.File]::WriteAllText()</code>에 <code>[System.Text.UTF8Encoding]::new($true)</code>를 지정하여 UTF-8 BOM(<code>EF BB BF</code>) 포함으로 PS1 파일을 재저장. PowerShell 5.1은 BOM을 감지하면 UTF-8로 파일을 올바르게 읽으므로 한글 경로 및 한글 문자열 처리 문제 해결.</p>
+  <p><span class="err-lbl">[해결 2단계]</span> bat 파일 내용에 <code>"C:\VIBE\발표시작.ps1"</code>이라는 한글 경로가 남아 있어, cmd.exe가 다시 해당 바이트를 CP949로 오독하여 창이 즉시 종료되는 문제 재발. PS1 파일을 순수 영문 이름 <code>start.ps1</code>으로 복사하고, bat 파일을 <code>powershell -ExecutionPolicy Bypass -File "C:\VIBE\start.ps1"</code> 한 줄(완전 ASCII)로 변경.</p>
+  <p><span class="err-lbl">[해결 3단계]</span> 파일 정리 목적으로 <code>발표시작.bat</code>과 <code>start.ps1</code>을 <code>C:\VIBE\9. AI사서응답시스템\</code>으로 이동한 후, bat 파일의 경로를 <code>"C:\VIBE\9. AI사서응답시스템\start.ps1"</code>으로 하드코딩하였으나 폴더명의 한글(사서응답시스템)이 다시 bat 파일 내에 포함되어 동일 오류 3회 재발. cmd 내장 변수 <code>%~dp0</code>(실행 중인 bat 파일의 폴더 경로를 런타임에 자동 해석)을 사용하여 <code>powershell -ExecutionPolicy Bypass -File "%~dp0start.ps1"</code>으로 변경. bat 파일 텍스트에 한글이 전혀 없으면서도 올바른 경로를 참조하여 최종 정상 실행 확인.</p>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     4. 최종 시스템 현황
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+<h2>4. 최종 시스템 현황</h2>
+
+<h3>4.1 완성된 기능</h3>
+<table>
+  <tr><th>기능</th><th>상태</th><th>세부 내용</th></tr>
+  <tr><td>국립중앙도서관 Q&amp;A 크롤링</td><td class="td-ok">완료</td><td>5,910건, 591페이지 전체 수집 (100%)</td></tr>
+  <tr><td>PostgreSQL DB 구축</td><td class="td-ok">완료</td><td>ai_librarian DB, qa_records 테이블</td></tr>
+  <tr><td>로컬 임베딩 생성</td><td class="td-ok">완료</td><td>384차원, 5,910건 전체 적용</td></tr>
+  <tr><td>BM25 전문검색</td><td class="td-ok">완료</td><td>PostgreSQL plainto_tsquery (simple)</td></tr>
+  <tr><td>벡터 유사도 검색</td><td class="td-ok">완료</td><td>pgvector 코사인 거리</td></tr>
+  <tr><td>RRF 하이브리드 검색</td><td class="td-ok">완료</td><td>쿼리 유형별 가중치 자동 조정</td></tr>
+  <tr><td>FastAPI 서버</td><td class="td-ok">완료</td><td>포트 8000, 3개 엔드포인트</td></tr>
+  <tr><td>Gemini RAG 스트리밍 답변</td><td class="td-ok">완료</td><td>gemini-2.5-flash, 출처 URL 포함</td></tr>
+  <tr><td>웹 UI</td><td class="td-ok">완료</td><td>브라우저 접속, 실시간 스트리밍</td></tr>
+  <tr><td>시스템 프롬프트 정교화</td><td class="td-imp">개선완료</td><td>역할·형식·출처인용·폴백 구조화</td></tr>
+  <tr><td>DB 연결 풀</td><td class="td-imp">개선완료</td><td>ThreadedConnectionPool(min=2, max=10)</td></tr>
+  <tr><td>답변 텍스트 정제</td><td class="td-imp">개선완료</td><td>곡선 따옴표·괄호 공백 정규화 후 전체 재임베딩</td></tr>
+  <tr><td>질문+답변 결합 임베딩</td><td class="td-imp">개선완료</td><td>질문+답변(200자) 결합 임베딩, 5,910건 재생성</td></tr>
+  <tr><td>한국어 형태소 분석</td><td class="td-imp">개선완료</td><td>kiwipiepy 기반 morphemes 컬럼 + GIN 인덱스</td></tr>
+  <tr><td>AI 답변 마크다운 렌더링</td><td class="td-imp">개선완료</td><td>marked.js — 굵게·목록·제목·코드 서식, 스트리밍 중 실시간 렌더링</td></tr>
+  <tr><td>AI 답변 대기 UX</td><td class="td-imp">개선완료</td><td>중앙 오버레이 팝업 — 책 아이콘 애니메이션 + 단계별 상태 메시지 순환</td></tr>
+  <tr><td>질문 히스토리</td><td class="td-imp">개선완료</td><td>localStorage 사이드바 — 클릭 재검색, 최대 30건, 새로고침 유지</td></tr>
+  <tr><td>검색 기록 재검색 버그 수정</td><td class="td-imp">수정완료 <span class="badge badge-fix">업데이트</span></td><td>onclick 속성 따옴표 충돌 수정</td></tr>
+  <tr><td>무결과 유사 질문 제안</td><td class="td-imp">개선완료</td><td>결과 없을 때 /api/suggest — 유사 질문 3개 카드로 제시</td></tr>
+  <tr><td>ngrok 외부 공개</td><td class="td-ok">완료</td><td>ngrok HTTPS 터널 — 스마트폰 접속 가능</td></tr>
+  <tr><td>유용도 피드백</td><td class="td-ok">완료</td><td>답변 하단 좋아요/별로에요 버튼 — localStorage 저장</td></tr>
+  <tr><td>ReadRhythm 앱 통합</td><td class="td-new">완료 <span class="badge badge-new">신규</span></td><td>🤖 AI사서 탭 — XMLHttpRequest 스트리밍, AsyncStorage 검색 기록</td></tr>
+  <tr><td>발표시작.bat</td><td class="td-new">완료 <span class="badge badge-new">신규</span></td><td>FastAPI + Expo 서버 일괄 실행 — 더블클릭 1회로 발표 환경 구성</td></tr>
+</table>
+
+<h3>4.2 프로젝트 파일 구조</h3>
+<table>
+  <tr><th>파일 / 폴더</th><th>역할</th></tr>
+  <tr><td>api/main.py</td><td>FastAPI 서버 — Gemini RAG 스트리밍, 3개 엔드포인트</td></tr>
+  <tr><td>search/hybrid.py</td><td>RRF 하이브리드 검색 (BM25 + 벡터, 알파 자동 조정)</td></tr>
+  <tr><td>crawler/crawl.py</td><td>국립중앙도서관 Q&amp;A 크롤러</td></tr>
+  <tr><td>crawler/data/</td><td>keys.json, qa_data.json (5,910건)</td></tr>
+  <tr><td>db/embed.py</td><td>DB 적재 + 임베딩 생성 (ON CONFLICT DO NOTHING)</td></tr>
+  <tr><td>frontend/index.html</td><td>웹 UI (마크다운·히스토리·유사질문 제안 포함)</td></tr>
+  <tr><td>fix_missing3.py</td><td>lxml 파서로 미수집 3건 재수집 <span class="badge badge-new">신규</span></td></tr>
+  <tr><td>update_check.py</td><td>신규 항목 감지 + 미수집 재시도 <span class="badge badge-new">신규</span></td></tr>
+  <tr><td>C:\VIBE\9. AI사서응답시스템\발표시작.bat</td><td>FastAPI + Expo 서버 일괄 실행 <span class="badge badge-new">신규</span></td></tr>
+</table>
+
+<h3>4.3 서버 실행 방법</h3>
+<div class="info-box">
+  <strong>발표시작.bat (권장)</strong> <span class="badge badge-new">신규</span><br>
+  <code>C:\VIBE\9. AI사서응답시스템\발표시작.bat</code> 더블클릭 한 번으로 아래 4가지 자동 실행 (창 4개 열림):<br>
+  &nbsp;&nbsp;① FastAPI 서버 (포트 8000) &nbsp;&nbsp;② ngrok 터널 (외부 공개 URL) &nbsp;&nbsp;③ ReadRhythm Expo (포트 8081) &nbsp;&nbsp;④ 실행 관리 창 (PowerShell — 닫지 말 것)
+</div>
+<div class="info-box">
+  <strong>수동 실행 (비상 시)</strong><br>
+  터미널 1: <code>cd "C:\VIBE\9. AI사서응답시스템" &amp;&amp; uvicorn api.main:app --port 8000</code><br>
+  터미널 2: <code>ngrok http --domain=conjure-overpay-reverb.ngrok-free.dev 8000</code>
+</div>
+
+<h3>4.4 외부 공개 (ngrok) — 오류 대응 및 범위 안내</h3>
+<div class="info-box">
+  <strong>외부 공유 URL (고정 도메인)</strong><br>
+  <code>https://conjure-overpay-reverb.ngrok-free.dev</code><br><br>
+  <strong>주의사항</strong><br>
+  ① 로컬 uvicorn 서버가 먼저 실행 중이어야 터널 작동<br>
+  ② 첫 접속 시 ngrok 경고 페이지 → <strong>Visit Site</strong> 클릭<br>
+  ③ Gemini 쿼터 리셋: UTC 자정 (KST 오전 9시)
+</div>
+
+<div class="new-box">
+  <strong>ERR_NGROK_3200 오류 발생 시 (엔드포인트 오프라인)</strong><br>
+  ngrok 터널 또는 FastAPI 서버가 꺼진 상태입니다. 아래 순서로 재시작하세요.<br><br>
+  <strong>방법 1 — 발표시작.bat 더블클릭</strong> (권장)<br>
+  <code>C:\VIBE\9. AI사서응답시스템\발표시작.bat</code> → FastAPI + ngrok + Expo 자동 시작 (창 4개 열림, 모두 유지)<br><br>
+  <strong>방법 2 — 터미널 직접 실행</strong><br>
+  터미널 1: <code>cd "C:\VIBE\9. AI사서응답시스템" &amp;&amp; uvicorn api.main:app --port 8000</code><br>
+  터미널 2: <code>ngrok http --domain=conjure-overpay-reverb.ngrok-free.dev 8000</code><br><br>
+  터미널 2에 <strong>Session Status: online</strong> 이 표시되면 URL 다시 접속 가능합니다.
+</div>
+
+<div class="con-box">
+  <strong>외부 공개 범위 제한 (ngrok 무료 플랜 구조적 한계)</strong><br><br>
+  ngrok 무료 플랜은 <strong>터널 1개만 허용</strong>되므로, 포트 8000(FastAPI)과 포트 8081(ReadRhythm Expo)을 동시에 외부 공개하는 것은 불가능합니다.<br><br>
+  <table style="font-size:11pt; margin:8px 0;">
+    <tr><th>포트</th><th>서비스</th><th>외부 접근</th><th>접근 방법</th></tr>
+    <tr><td>8000</td><td>AI 사서 웹 UI (FastAPI)</td><td style="color:#0f766e;font-weight:700">가능 ✓</td><td>ngrok URL 공유</td></tr>
+    <tr><td>8081</td><td>ReadRhythm 앱 (Expo)</td><td style="color:#b45309;font-weight:700">불가 ✗</td><td>로컬 시연만 가능</td></tr>
+  </table>
+  또한 ReadRhythm 앱 내 AI사서 탭은 내부적으로 <code>localhost:8000</code>으로 API를 호출하므로, 외부 기기에서 접속해도 API 연결이 되지 않습니다.<br><br>
+  <strong>권장 시연 방법</strong><br>
+  · 외부 공유 (카카오톡 등): <code>https://conjure-overpay-reverb.ngrok-free.dev</code> → AI 사서 웹 UI<br>
+  · ReadRhythm 앱 시연: 발표자 노트북 화면을 빔프로젝터에 연결하여 <code>http://localhost:8081</code> 직접 시연
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     5. ReadRhythm 앱 통합
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+<h2>5. ReadRhythm 앱 통합 <span class="badge badge-new">신규</span></h2>
+
+<p>교수님 지시에 따라 기존 독서 습관 관리 앱 <strong>ReadRhythm</strong>(React Native Expo SDK 54, TypeScript)에 AI 사서 기능을 통합하였다.</p>
+
+<h3>5.1 통합 구조</h3>
+<div class="code-box">ReadRhythm 앱 (React Native Expo, 포트 8081)
+  └─ 하단 탭: 🤖 AI사서 (7번째 탭으로 추가)
+       ├─ 질문 입력창 + 예시 질문 버튼 (4종)
+       ├─ XMLHttpRequest onprogress → 실시간 스트리밍 텍스트 갱신
+       ├─ AsyncStorage 검색 기록 (최대 20건, 클릭 재검색)
+       └─ HTTP 요청 → FastAPI(8000) → Gemini 2.5 Flash → 스트리밍 답변</div>
+
+<h3>5.2 기술 비교</h3>
+<table>
+  <tr><th>항목</th><th>독립 웹 UI</th><th>ReadRhythm 통합</th></tr>
+  <tr><td>플랫폼</td><td>브라우저 (포트 8000)</td><td>React Native Expo (포트 8081)</td></tr>
+  <tr><td>스트리밍</td><td>ReadableStream + getReader()</td><td>XMLHttpRequest onprogress</td></tr>
+  <tr><td>검색 기록</td><td>localStorage (최대 30건)</td><td>AsyncStorage (최대 20건)</td></tr>
+  <tr><td>LLM 백엔드</td><td colspan="2" style="text-align:center">동일 — FastAPI → Gemini 2.5 Flash</td></tr>
+  <tr><td>외부 공개</td><td>ngrok 터널로 외부 공유 가능</td><td>로컬 전용 (포트 충돌·API 주소 한계)</td></tr>
+</table>
+
+<h3>5.3 시연 방법</h3>
+<div class="info-box">
+  <strong>외부 공유 (카카오톡 등)</strong> — AI 사서 독립 웹 UI<br>
+  <code>https://conjure-overpay-reverb.ngrok-free.dev</code> 링크 전송 → 수강생이 브라우저에서 직접 사용
+</div>
+<div class="info-box">
+  <strong>ReadRhythm 앱 시연</strong> — 로컬 발표자 화면<br>
+  발표자 노트북을 빔프로젝터에 연결 → <code>http://localhost:8081</code> 브라우저에서 열어 하단 🤖 AI사서 탭 시연<br>
+  <span style="color:#b45309">※ ngrok 무료 플랜은 터널 1개 제한이므로 ReadRhythm(포트 8081)과 FastAPI(포트 8000)를 동시에 외부 공개하는 것은 불가합니다.</span>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     6. 개선 방안
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+<h2>6. 개선 방안</h2>
+
+<div class="plan-block">
+  <div class="plan-head">6.1 데이터 품질 — 한국어 특화 임베딩 모델 도입</div>
+  <div class="plan-point">• BGE-M3, KoSimCSE 등 한국어 특화 모델로 교체 시 도서관 전문 용어 검색 정밀도 개선 가능</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; 현재 paraphrase-multilingual-MiniLM은 범용 다국어 모델로, 도서관 전문 용어·한국어 어휘 변이에서 의미 유사도 정확도가 제한됨. '사서', '소장', '청구기호' 등 고유 개념에서 벡터 거리 오차 발생 가능.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; 전체 5,910건 재임베딩 수 시간 소요, 모델 파일 수 GB 저장 공간 부담, 한국어 특화 모델일수록 영어·다국어 질문 대응력 저하, 라이선스 확인 필요.</div>
+</div>
+
+<div class="plan-block">
+  <div class="plan-head">6.2 검색 품질 — 도서관 용어 동의어 사전 구축</div>
+  <div class="plan-point">• '대출=빌리기', '반납=돌려주기' 등 일상어-전문용어 매핑으로 BM25 키워드 검색 재현율 향상</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; 이용자는 전문 용어에 익숙하지 않아 일상어로 질문하면 키워드 검색에서 결과가 누락됨. 벡터 검색이 보완하고 있으나 고유명사·약어 처리는 한계가 있음.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; 사전 초기 구축 및 유지보수에 도메인 전문가 투입 필요, 과잉 확장 시 무관한 결과 혼입 가능, 신조어·비표준 표현의 주기적 갱신 부담.</div>
+</div>
+
+<div class="plan-block">
+  <div class="plan-head">6.3 AI 답변 품질 — 응답 캐싱 도입</div>
+  <div class="plan-point">• Redis 또는 DB에 빈출 질문 상위 50건 답변 사전 저장 → Gemini API 호출 횟수 절감</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; 동일·유사 질문이 반복될 때마다 Gemini API를 호출하면 무료 쿼터 소진이 가속됨. 캐싱 도입 시 응답 속도 향상과 쿼터 절약을 동시에 달성 가능.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; Redis 서버 별도 구축·운영 필요(추가 인프라), 캐시 유효기간 및 무효화 로직 관리 복잡, AI 답변 품질 개선 시 기존 캐시 전체 재생성 필요.</div>
+</div>
+
+<div class="plan-block">
+  <div class="plan-head">6.4 시스템 안정성 — 프로세스 자동 관리</div>
+  <div class="plan-point">• PM2 또는 Windows 서비스 등록으로 서버 자동 시작·재시작 및 상시 운영 환경 구성</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; 현재는 PowerShell에서 uvicorn 명령어를 수동 실행해야 하며, 컴퓨터 재시작 시 서버가 복구되지 않아 지속 서비스가 불가능함.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; PM2는 Node.js 환경 별도 필요(이종 스택 혼재), Windows 서비스 등록은 관리자 권한 및 설정 복잡성 수반, 모니터링 도구 추가 학습 필요.</div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     7. 향후 운영 방안
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+<h2>7. 향후 운영 방안</h2>
+
+<div class="plan-block">
+  <div class="plan-head">7.1 데이터 최신성 유지 — 증분 수집 스케줄러</div>
+  <div class="plan-point">• 월 1회 자동 크롤러 실행으로 신규 Q&amp;A를 감지·수집하고 신규 건만 임베딩 생성하여 DB 적재</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; 현재 5,910건은 특정 시점의 스냅샷으로, 시간이 지날수록 최신 사서 답변이 누락되어 검색 커버리지가 점차 저하됨. <code>update_check.py</code> 실행 시 최신 3페이지 자동 확인 + 신규 항목 수집까지 일괄 처리.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; 스케줄러 실행을 위해 서버 상시 가동 필요, 국립중앙도서관 웹 구조 변경 시 크롤러 수정 필요, robots.txt 정책 변경 시 수집 불가 위험 존재.</div>
+</div>
+
+<div class="plan-block">
+  <div class="plan-head">7.2 비용 최적화 — API 한도 확대 및 로컬 LLM 전환</div>
+  <div class="plan-point">• ① Google for Education 계정 신청: 학술·교육 목적으로 Gemini API 무료 한도 확대 가능</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; 무료 tier 일일 한도 초과 시 AI 답변 중단, 폴백 응답으로 대체됨. Education 계정 승인 시 한도 제한 완화로 안정적 운영 가능.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; 교육 기관 인증 절차 필요, 심사 승인까지 기간 불확실.</div>
+  <div class="plan-point">• ② 로컬 LLM 전환: Ollama + LLaMA3-Korean 또는 EXAONE으로 API 비용 0원, 개인정보 보호</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; API 의존성 제거로 쿼터 제한 없이 운영 가능, 개인정보가 외부 서버로 전송되지 않음.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; GPU 미탑재 노트북에서 응답 30초 이상 소요, 한국어 답변 품질이 Gemini 2.5 Flash 대비 저하. → <strong>발표 환경에서는 Gemini 유지 결정.</strong></div>
+</div>
+
+<div class="plan-block">
+  <div class="plan-head">7.3 접근성 확대 — 상시 외부 배포</div>
+  <div class="plan-point">• 현재 ngrok 터널 운영 중 → 향후 Render.com, Railway 등 무료 클라우드로 고정 URL 상시 운영</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; ngrok은 재시작마다 URL이 변경되어 지속 서비스에 한계. 클라우드 배포 시 24시간 고정 URL 제공, 별도 PC 가동 불필요.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; Render.com 무료 플랜은 15분 비활성 시 서버 슬립(첫 응답 30초 지연), 컴퓨팅 제한으로 임베딩 모델 로딩 속도 저하, PostgreSQL 별도 클라우드 DB 연동 필요.</div>
+</div>
+
+<div class="plan-block">
+  <div class="plan-head">7.4 확장 가능성</div>
+  <div class="plan-point">• ① 피드백 데이터 활용 (구현 완료): 수집된 좋아요/별로에요를 검색 가중치·프롬프트 개선 근거로 활용</div>
+  <div class="plan-point">• ② 다른 도서관 Q&amp;A로 확장: 공공도서관·대학도서관 데이터 추가 수집 후 동일 시스템 적용</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; 단일 도서관 데이터로는 질문 커버리지에 한계. 복수 도서관 통합 시 다양한 주제의 사서 답변 제공 가능.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; 각 도서관별 웹 구조 달라 크롤러 별도 개발 필요, 데이터 형식·용어 체계 상이로 전처리 추가 작업 필요.</div>
+  <div class="plan-point">• ③ 멀티모달 확장: 도서 표지·도표 포함 자료 검색 시 Gemini의 멀티모달 기능 활용 가능</div>
+  <div class="need-box"><strong>필요성</strong>&nbsp; 텍스트 질문만 처리하는 현재 시스템을 이미지 기반 검색으로 확장하여 서비스 범위 대폭 확대 가능.</div>
+  <div class="con-box"><strong>단점</strong>&nbsp; 이미지 임베딩 추가 비용 발생, 도서 표지·도표 이미지의 저작권 처리 방안 검토 필요.</div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     8. 결론
+══════════════════════════════════════════ -->
+<div class="page-break"></div>
+<div class="page-title">AI 사서 응답시스템 개발 보고서</div>
+<h2>8. 결론</h2>
+
+<h3>8.1 프로젝트 요약</h3>
+<p>본 프로젝트는 국립중앙도서관이 '사서문답' 서비스를 통해 축적한 <strong>5,910건의 전문 사서 답변 데이터</strong>를 AI가 검색·활용할 수 있는 형태로 구조화하는 데서 출발하였습니다. BM25 전문검색과 벡터 유사도 검색을 RRF 알고리즘으로 통합한 하이브리드 검색 엔진을 구현하였으며, 여기에 Gemini 2.5 Flash RAG를 결합하여 이용자의 자연어 질문에 실시간 스트리밍 방식으로 출처 기반 답변을 제공하는 시스템을 완성하였습니다.</p>
+<p>전체 시스템은 임베딩 비용 0원(로컬 모델), AI 답변 비용 0원(Gemini 무료 tier)으로 구축되었으며, 교수님 지시에 따라 ReadRhythm 앱에 AI 사서 탭을 통합하여 독서 습관 앱과 도서관 Q&amp;A 서비스를 하나의 플랫폼에서 제공하게 되었습니다.</p>
+
+<h3>8.2 개발 과정에서 얻은 교훈</h3>
+<p><strong>실제 운영 환경 이슈 체득</strong><br>
+크롤러 파라미터 오류, pgvector Windows 설치 복잡성, SDK deprecated 전환, API 쿼터 초과, 구버전 서버 프로세스 잔류, HTML 엔티티 불량 데이터 처리 등 교과서에서 다루지 않는 10건의 문제를 직접 해결하며 RAG 시스템 개발의 전주기적 복잡성을 체득하였습니다.</p>
+<p><strong>비용 최소화 설계의 실증</strong><br>
+OpenAI, Anthropic 등 유료 API 없이 로컬 sentence-transformers 임베딩과 Gemini 무료 tier만으로 실용적 수준의 RAG를 구축할 수 있음을 확인하였습니다. 임베딩 비용 0원, AI 답변 비용 0원이라는 결과는 예산 제약이 있는 학술·공공·소규모 환경에 적용 가능한 구체적 아키텍처를 제시합니다.</p>
+<p><strong>이용자 경험의 지속적 중요성</strong><br>
+검색·AI 엔진 완성 이후에도 마크다운 렌더링, 답변 대기 UX, 질문 히스토리, 무결과 제안, ReadRhythm 앱 통합 등 UI/플랫폼 개선 작업이 전체 개발의 상당 부분을 차지하였습니다. 기술적 정확성과 더불어 이용자가 체감하는 서비스 품질이 도서관 정보 시스템의 실질적 활용도를 결정하는 핵심 요소임을 재확인하였습니다.</p>
+
+<h3>8.3 최종 성과 요약</h3>
+<table>
+  <tr><th colspan="2">시스템 완성 현황</th></tr>
+  <tr><td>수집 데이터</td><td><strong>5,910건</strong> (국립중앙도서관 사서문답 전체, 100% 성공률)</td></tr>
+  <tr><td>DB 구축</td><td>PostgreSQL 17 + pgvector, 384차원 임베딩 완료</td></tr>
+  <tr><td>검색 방식</td><td>RRF 하이브리드 (BM25 35% + 벡터 65%, 쿼리 유형별 자동 조정)</td></tr>
+  <tr><td>AI 답변</td><td>Gemini 2.5 Flash 스트리밍 + 출처 [1] URL 인용 형식 제공</td></tr>
+  <tr><td>프롬프트 개선</td><td>역할·형식·제약 구조화, 폴백 응답(쿼터 초과 시 검색결과 직접 표시)</td></tr>
+  <tr><td>DB 연결 풀</td><td>ThreadedConnectionPool(min=2, max=10), 자동 재연결 포함</td></tr>
+  <tr><td>질문 히스토리</td><td>localStorage 기반 좌측 사이드바 — 최근 30건, 클릭 재검색</td></tr>
+  <tr><td>검색 기록 버그 수정</td><td>onclick 따옴표 충돌 수정 — 클릭 시 정상 재검색 <span class="badge badge-fix">수정</span></td></tr>
+  <tr><td>ReadRhythm 앱 통합</td><td>🤖 AI사서 탭 — XMLHttpRequest 스트리밍, AsyncStorage 기록 <span class="badge badge-new">신규</span></td></tr>
+  <tr><td>발표시작.bat</td><td>더블클릭 1회로 FastAPI + Expo 서버 일괄 실행 <span class="badge badge-new">신규</span></td></tr>
+  <tr><td>외부 공개</td><td>ngrok 터널 — https://conjure-overpay-reverb.ngrok-free.dev</td></tr>
+  <tr><td>운영 비용</td><td>임베딩 0원(로컬), AI 답변 Gemini 무료 tier 활용</td></tr>
+  <tr><td>이동성</td><td>와이파이 변경 시에도 정상 동작 (DB·임베딩은 로컬)</td></tr>
+</table>
+
+<div style="text-align:center; margin-top:20px; font-size:9pt; color:#8a9ab0;">
+본 보고서는 Claude Code(AI)와 협업하여 작성되었습니다.
+</div>
+
+</body>
+</html>

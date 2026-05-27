@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 사서에게 물어보세요 — 국립중앙도서관</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root {
+    --blue:    #1e5a96;
+    --dark:    #0d2b4e;
+    --mid:     #1a4a7a;
+    --light:   #EEF2F8;
+    --cream:   #EBF0F7;
+    --terra:   #E07B54;
+    --border:  #C0CEDF;
+    --text:    #1a1a2e;
+    --muted:   #5a6a80;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── 헤더 ── */
+  header {
+    background: linear-gradient(135deg, var(--dark) 0%, var(--mid) 55%, var(--blue) 100%);
+    color: #fff;
+    padding: 2.2rem 1.5rem 1.8rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 70% 40%, rgba(100,160,220,.15) 0%, transparent 60%);
+  }
+  .header-badge {
+    display: inline-block;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 20px;
+    padding: .25rem .85rem;
+    font-size: .73rem;
+    letter-spacing: .06em;
+    margin-bottom: .7rem;
+  }
+  header h1 {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 1.75rem;
+    letter-spacing: .02em;
+    position: relative;
+  }
+  header p {
+    margin-top: .45rem;
+    font-size: .85rem;
+    opacity: .75;
+    position: relative;
+  }
+
+  /* ── 검색 영역 ── */
+  .search-wrap {
+    max-width: 800px;
+    margin: 2rem auto 0;
+    padding: 0 1rem;
+  }
+  .search-box {
+    background: #fff;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .search-box:focus-within {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(30,90,150,.1);
+  }
+  .search-box input {
+    flex: 1;
+    padding: .85rem 1.1rem;
+    font-size: 1rem;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    color: var(--text);
+  }
+  .search-box button {
+    padding: .85rem 1.4rem;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    font-size: .95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .2s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .search-box button:hover { background: var(--dark); }
+  .search-box button:disabled { background: #8aabcc; cursor: not-allowed; }
+
+  /* 예시 질문 */
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .8rem;
+  }
+  .ex-btn {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: .3rem .85rem;
+    font-size: .8rem;
+    color: var(--blue);
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    font-family: inherit;
+  }
+  .ex-btn:hover { background: var(--light); border-color: var(--blue); }
+
+  /* 에러 */
+  #error-msg {
+    display: none;
+    margin-top: .6rem;
+    color: #c33;
+    font-size: .85rem;
+    padding: .5rem .7rem;
+    background: #fff0f0;
+    border-radius: 6px;
+    border-left: 3px solid #c33;
+  }
+
+  /* ── 결과 영역 ── */
+  .content {
+    max-width: 800px;
+    margin: 1.4rem auto 3rem;
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  /* ── 카드 ── */
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .card-head {
+    padding: .85rem 1.3rem;
+    border-bottom: 1px solid var(--light);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .card-head .bar {
+    width: 3px; height: 15px;
+    background: var(--blue);
+    border-radius: 2px;
+  }
+  .card-head .title {
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--blue);
+  }
+  .card-head .subtitle {
+    margin-left: auto;
+    font-size: .75rem;
+    color: var(--muted);
+  }
+  .card-body { padding: 1.2rem 1.3rem; }
+
+  /* ── AI 답변 ── */
+  #answer-card { display: none; }
+  #answer-text {
+    line-height: 1.85;
+    font-size: .96rem;
+    word-break: break-word;
+  }
+  #answer-text p { margin-bottom: .7rem; }
+  #answer-text p:last-child { margin-bottom: 0; }
+  #answer-text h1, #answer-text h2, #answer-text h3 {
+    font-weight: 700; color: var(--dark);
+    margin: 1rem 0 .4rem;
+  }
+  #answer-text h1 { font-size: 1.1rem; }
+  #answer-text h2 { font-size: 1rem; }
+  #answer-text h3 { font-size: .95rem; }
+  #answer-text ul, #answer-text ol {
+    padding-left: 1.4rem;
+    margin-bottom: .7rem;
+  }
+  #answer-text li { margin-bottom: .25rem; }
+  #answer-text strong { font-weight: 700; color: var(--dark); }
+  #answer-text code {
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: .1em .35em;
+    font-size: .88em;
+    font-family: 'Consolas', monospace;
+  }
+  #answer-text a { color: var(--blue); }
+  #answer-text a:hover { text-decoration: underline; }
+  #answer-text hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: .8rem 0;
+  }
+
+  /* ── 피드백 버튼 ── */
+  #feedback-wrap {
+    display: none;
+    margin-top: 1rem;
+    padding-top: .85rem;
+    border-top: 1px solid var(--border);
+  }
+  .feedback-line {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    flex-wrap: wrap;
+  }
+  .feedback-prompt {
+    font-size: .82rem;
+    color: var(--muted);
+  }
+  .fb-btn {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: .28rem .85rem;
+    font-size: .82rem;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text);
+    transition: background .15s, border-color .15s, transform .08s;
+  }
+  .fb-btn:hover:not(:disabled) {
+    background: var(--light);
+    border-color: var(--blue);
+    transform: translateY(-1px);
+  }
+  .fb-btn:disabled { cursor: default; }
+  .fb-btn.vote-good { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
+  .fb-btn.vote-bad  { background: #fce4ec; border-color: #e91e63; color: #880e4f; }
+  #feedback-thanks {
+    display: none;
+    margin-top: .45rem;
+    font-size: .82rem;
+    color: var(--muted);
+  }
+
+  /* 로딩 닷 */
+  .loading-dots {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    background: var(--blue);
+    border-radius: 50%;
+    animation: blink .9s ease-in-out infinite;
+  }
+  .dot:nth-child(2) { animation-delay: .15s; }
+  .dot:nth-child(3) { animation-delay: .30s; }
+  @keyframes blink { 0%,80%,100%{transform:scale(0)} 40%{transform:scale(1)} }
+
+  /* ── 사서 생각 중 오버레이 ── */
+  #thinking-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(10, 30, 60, .52);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+  }
+  #thinking-overlay.active { display: flex; }
+
+  .thinking-box {
+    background: #fff;
+    border-radius: 22px;
+    padding: 2.8rem 3.5rem;
+    text-align: center;
+    box-shadow: 0 24px 64px rgba(0,0,0,.28);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    min-width: 280px;
+    animation: box-in .25s ease;
+  }
+  @keyframes box-in {
+    from { transform: scale(.9); opacity: 0; }
+    to   { transform: scale(1);  opacity: 1; }
+  }
+  .thinking-book {
+    font-size: 3.6rem;
+    display: inline-block;
+    animation: book-float 1.8s ease-in-out infinite;
+    filter: drop-shadow(0 4px 8px rgba(30,90,150,.25));
+  }
+  @keyframes book-float {
+    0%, 100% { transform: translateY(0) rotate(-4deg); }
+    50%       { transform: translateY(-10px) rotate(4deg); }
+  }
+  .thinking-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--dark);
+    letter-spacing: -.01em;
+  }
+  .thinking-sub {
+    font-size: .88rem;
+    color: var(--muted);
+    min-height: 1.4em;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+  }
+  #thinking-msg { transition: opacity .28s ease; }
+  .thinking-ellipsis::after {
+    content: '';
+    animation: ellipsis 1.4s steps(4, end) infinite;
+  }
+  @keyframes ellipsis {
+    0%  { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+  }
+
+  /* ── 원문 Q&A ── */
+  #sources-card { display: none; }
+
+  .qa-item {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: .7rem;
+    overflow: hidden;
+  }
+  .qa-item:last-child { margin-bottom: 0; }
+
+  .qa-head {
+    background: var(--light);
+    padding: .65rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    cursor: pointer;
+    gap: .6rem;
+    user-select: none;
+  }
+  .qa-head:hover { background: #d8e5f3; }
+
+  .qa-num {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    background: var(--blue);
+    color: #fff;
+    border-radius: 50%;
+    font-size: .72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .qa-q-preview {
+    flex: 1;
+    font-size: .88rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .qa-meta {
+    flex-shrink: 0;
+    font-size: .72rem;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.4;
+  }
+  .qa-toggle {
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: .8rem;
+    margin-top: 2px;
+  }
+
+  .qa-body {
+    display: none;
+    padding: 1rem;
+    font-size: .875rem;
+    line-height: 1.75;
+    border-top: 1px solid var(--border);
+    background: #fafcff;
+  }
+  .qa-body.open { display: block; }
+
+  .label {
+    font-size: .73rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    margin-bottom: .3rem;
+  }
+  .label-q { color: var(--terra); }
+  .label-a { color: var(--blue); margin-top: .8rem; }
+  .label-src { color: var(--muted); margin-top: .8rem; }
+
+  .qa-body a {
+    color: var(--blue);
+    font-size: .8rem;
+    word-break: break-all;
+  }
+  .qa-body a:hover { text-decoration: underline; }
+
+  /* ── 유사 질문 제안 ── */
+  #suggest-card { display: none; }
+  .suggest-intro {
+    font-size: .88rem;
+    color: var(--muted);
+    margin-bottom: .85rem;
+  }
+  .suggest-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: .7rem 1rem;
+    font-size: .9rem;
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1.45;
+    transition: background .15s, border-color .15s, transform .1s;
+    margin-bottom: .5rem;
+  }
+  .suggest-item:last-child { margin-bottom: 0; }
+  .suggest-item:hover {
+    background: #dce9f8;
+    border-color: var(--blue);
+    transform: translateX(3px);
+  }
+  .suggest-item::before {
+    content: '→ ';
+    color: var(--blue);
+    font-weight: 700;
+  }
+
+  /* ── 사이드바 레이아웃 ── */
+  .page-body {
+    display: flex;
+    align-items: flex-start;
+  }
+  #sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--dark);
+    min-height: calc(100vh - 110px);
+    position: sticky;
+    top: 0;
+    padding: 1.2rem .75rem;
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+  }
+  .sidebar-title {
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.4);
+    padding: 0 .3rem .6rem;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    margin-bottom: .2rem;
+  }
+  #hist-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    overflow-y: auto;
+    max-height: calc(100vh - 180px);
+  }
+  .hist-item {
+    background: rgba(255,255,255,.07);
+    border: 1px solid transparent;
+    border-radius: 7px;
+    padding: .45rem .65rem;
+    font-size: .8rem;
+    color: rgba(255,255,255,.8);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background .15s, border-color .15s;
+    font-family: inherit;
+    text-align: left;
+    width: 100%;
+  }
+  .hist-item:hover {
+    background: rgba(255,255,255,.15);
+    border-color: rgba(255,255,255,.18);
+    color: #fff;
+  }
+  .hist-empty {
+    font-size: .78rem;
+    color: rgba(255,255,255,.25);
+    text-align: center;
+    padding: 1.5rem 0;
+    line-height: 1.6;
+  }
+  .hist-clear {
+    margin-top: auto;
+    padding: .45rem;
+    background: none;
+    border: none;
+    border-top: 1px solid rgba(255,255,255,.1);
+    color: rgba(255,255,255,.3);
+    font-size: .73rem;
+    cursor: pointer;
+    width: 100%;
+    font-family: inherit;
+    transition: color .15s;
+  }
+  .hist-clear:hover { color: rgba(255,255,255,.65); }
+  .main-col { flex: 1; min-width: 0; }
+
+  /* ── 반응형 ── */
+  @media (max-width: 700px) {
+    #sidebar { display: none; }
+  }
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.35rem; }
+    .search-box button { padding: .85rem 1rem; font-size: .88rem; }
+    .card-body { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-badge">국립중앙도서관 지식정보 DB 기반 RAG</div>
+  <h1>AI 사서에게 물어보세요</h1>
+  <p style="margin-top:.55rem;font-size:.82rem;opacity:.9;letter-spacing:.03em;">문헌정보학과 대학원&nbsp;&nbsp;|&nbsp;&nbsp;디지털도서관특강&nbsp;&nbsp;|&nbsp;&nbsp;2026. 05. 18. 발표</p>
+  <p>실제 사서 답변 데이터만을 근거로 응답합니다 · 출처 URL 항상 표시</p>
+</header>
+
+<div class="page-body">
+
+<aside id="sidebar">
+  <div class="sidebar-title">검색 기록</div>
+  <div id="hist-list">
+    <div class="hist-empty">검색 기록이 없습니다</div>
+  </div>
+  <button class="hist-clear" onclick="clearHistory()">기록 전체 삭제</button>
+</aside>
+
+<div class="main-col">
+
+<div class="search-wrap">
+  <div class="search-box">
+    <input id="q-input" type="text" placeholder="질문을 입력하세요..." aria-label="검색 질문 입력">
+    <button id="ask-btn" onclick="ask()">검색</button>
+  </div>
+
+  <div class="examples">
+    <span style="font-size:.78rem;color:var(--muted);align-self:center;">예시:</span>
+    <button class="ex-btn" onclick="setQ(this)">루이스 캐롤 관련 자료</button>
+    <button class="ex-btn" onclick="setQ(this)">중학생을 위한 과학책 추천</button>
+    <button class="ex-btn" onclick="setQ(this)">저작권법 관련 논문 목록</button>
+    <button class="ex-btn" onclick="setQ(this)">멀티미디어 메타데이터 자료</button>
+    <button class="ex-btn" onclick="setQ(this)">도서관 관련 단행본 추천</button>
+  </div>
+
+  <div id="error-msg"></div>
+</div>
+
+<div id="thinking-overlay">
+  <div class="thinking-box">
+    <span class="thinking-book">📚</span>
+    <div class="thinking-label">AI 사서가 답변을 준비하고 있습니다</div>
+    <div class="thinking-sub">
+      <span id="thinking-msg">관련 자료를 찾고 있습니다</span><span class="thinking-ellipsis"></span>
+    </div>
+    <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  </div>
+</div>
+
+<div class="content">
+
+  <div class="card" id="answer-card">
+    <div class="card-head">
+      <div class="bar"></div>
+      <span class="title">AI 사서 답변</span>
+      <span class="subtitle" id="answer-subtitle"></span>
+    </div>
+    <div class="card-body">
+      <div id="answer-text"></div>
+      <div id="feedback-wrap">
+        <div class="feedback-line">
+          <span class="feedback-prompt">이 답변이 도움이 됐나요?</span>
+          <button class="fb-btn" onclick="submitFeedback('good', this)">👍 도움이 됐어요</button>
+          <button class="fb-btn" onclick="submitFeedback('bad', this)">👎 별로예요</button>
+        </div>
+        <div id="feedback-thanks"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="suggest-card">
+    <div class="card-head">
+      <div class="bar"></div>
+      <span class="title">혹시 이런 질문이었나요?</span>
+    </div>
+    <div class="card-body">
+      <p class="suggest-intro">직접 일치하는 자료를 찾지 못했습니다. 의미가 비슷한 질문들을 클릭하면 바로 검색됩니다.</p>
+      <div id="suggest-list"></div>
+    </div>
+  </div>
+
+  <div class="card" id="sources-card">
+    <div class="card-head">
+      <div class="bar"></div>
+      <span class="title">검색된 원문 Q&amp;A</span>
+      <span class="subtitle" id="sources-subtitle"></span>
+    </div>
+    <div class="card-body" id="sources-list"></div>
+  </div>
+
+</div>
+
+</div><!-- /.main-col -->
+</div><!-- /.page-body -->
+
+<script>
+const API = '';
+
+marked.setOptions({ breaks: true, gfm: true });
+
+// ── 검색 히스토리 ──────────────────────────────────────────
+const HIST_KEY = 'ai_librarian_history';
+const HIST_MAX = 30;
+
+function saveHistory(q) {
+  let hist = getHistory();
+  hist = [q, ...hist.filter(x => x !== q)].slice(0, HIST_MAX);
+  localStorage.setItem(HIST_KEY, JSON.stringify(hist));
+  renderHistory();
+}
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch { return []; }
+}
+function renderHistory() {
+  const list = document.getElementById('hist-list');
+  const hist = getHistory();
+  if (!hist.length) {
+    list.innerHTML = '<div class="hist-empty">검색 기록이<br>없습니다</div>';
+    return;
+  }
+  list.innerHTML = hist.map(q =>
+    `<button class="hist-item" onclick='setHistQ(${JSON.stringify(q)})' title="${esc(q)}">${esc(q)}</button>`
+  ).join('');
+}
+function setHistQ(q) {
+  document.getElementById('q-input').value = q;
+  ask();
+}
+function clearHistory() {
+  localStorage.removeItem(HIST_KEY);
+  renderHistory();
+}
+
+const THINKING_MSGS = [
+  '관련 자료를 찾고 있습니다',
+  '문헌을 검토하고 있습니다',
+  '사서가 답변을 작성하고 있습니다',
+  '잠시만 기다려 주세요',
+];
+let _thinkingTimer = null;
+
+function startThinking() {
+  document.getElementById('thinking-overlay').classList.add('active');
+  let idx = 0;
+  _thinkingTimer = setInterval(() => {
+    const el = document.getElementById('thinking-msg');
+    if (!el) { stopThinking(); return; }
+    el.style.opacity = '0';
+    idx = (idx + 1) % THINKING_MSGS.length;
+    setTimeout(() => {
+      const el2 = document.getElementById('thinking-msg');
+      if (el2) { el2.textContent = THINKING_MSGS[idx]; el2.style.opacity = '1'; }
+    }, 280);
+  }, 2000);
+}
+
+function stopThinking() {
+  if (_thinkingTimer) { clearInterval(_thinkingTimer); _thinkingTimer = null; }
+  document.getElementById('thinking-overlay').classList.remove('active');
+  document.getElementById('thinking-msg').textContent = THINKING_MSGS[0];
+}
+
+function setQ(btn) {
+  document.getElementById('q-input').value = btn.textContent;
+  ask();
+}
+
+async function ask() {
+  const query = document.getElementById('q-input').value.trim();
+  if (!query) return;
+  saveHistory(query);
+
+  const askBtn = document.getElementById('ask-btn');
+  askBtn.disabled = true;
+  askBtn.textContent = '검색 중...';
+  setError('');
+
+  showCard('answer-card', true);
+  showCard('sources-card', false);
+  showCard('suggest-card', false);
+  hideFeedback();
+  document.getElementById('answer-subtitle').textContent = '';
+  document.getElementById('answer-text').innerHTML = loadingHTML();
+  document.getElementById('sources-list').innerHTML = '';
+  document.getElementById('suggest-list').innerHTML = '';
+  startThinking();
+
+  // 1) 원문 검색
+  let hits = [];
+  try {
+    const sr = await fetch(`${API}/api/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, top_k: 5 }),
+    });
+    if (!sr.ok) throw new Error(`서버 오류 (${sr.status})`);
+    const sd = await sr.json();
+    hits = sd.results || [];
+  } catch (e) {
+    setError(`검색 오류: ${e.message}`);
+    askBtn.disabled = false;
+    askBtn.textContent = '검색';
+    return;
+  }
+
+  if (hits.length) {
+    renderSources(hits);
+    showCard('sources-card', true);
+    document.getElementById('sources-subtitle').textContent = `${hits.length}건`;
+  } else {
+    try {
+      const sg = await fetch(`${API}/api/suggest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, top_k: 3 }),
+      });
+      if (sg.ok) {
+        const { suggestions } = await sg.json();
+        if (suggestions?.length) {
+          renderSuggestions(suggestions);
+          showCard('suggest-card', true);
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 2) AI 스트리밍 답변
+  try {
+    const resp = await fetch(`${API}/api/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, top_k: 5 }),
+    });
+    if (!resp.ok) throw new Error(`AI 응답 오류 (${resp.status})`);
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let answer = '';
+    const el = document.getElementById('answer-text');
+    stopThinking();
+    el.innerHTML = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      answer += decoder.decode(value, { stream: true });
+      el.innerHTML = marked.parse(answer);
+    }
+
+    document.getElementById('answer-subtitle').textContent =
+      `${answer.length}자 · 출처 ${hits.length}건`;
+    showFeedback();
+  } catch (e) {
+    stopThinking();
+    document.getElementById('answer-text').innerHTML =
+      `<p style="color:#c33">AI 답변 생성 중 오류가 발생했습니다: ${esc(e.message)}</p>`;
+  }
+
+  askBtn.disabled = false;
+  askBtn.textContent = '검색';
+}
+
+function renderSources(hits) {
+  const list = document.getElementById('sources-list');
+  list.innerHTML = hits.map((h, i) => `
+    <div class="qa-item">
+      <div class="qa-head" onclick="toggleQA(${i}, this)">
+        <div class="qa-num">${i + 1}</div>
+        <div class="qa-q-preview">${esc(h.question.slice(0, 70))}${h.question.length > 70 ? '…' : ''}</div>
+        <div class="qa-meta">${esc(h.library || '')}<br>${esc(h.category || '')}</div>
+        <div class="qa-toggle" id="toggle-${i}">▼</div>
+      </div>
+      <div class="qa-body" id="qa-body-${i}">
+        <div class="label label-q">Q. 질문</div>
+        <div>${esc(h.question)}</div>
+        <div class="label label-a">A. 답변</div>
+        <div>${esc((h.answer || '').slice(0, 700))}${(h.answer || '').length > 700 ? '…' : ''}</div>
+        <div class="label label-src">출처</div>
+        <div><a href="${esc(h.source_url)}" target="_blank" rel="noopener noreferrer">${esc(h.source_url)}</a></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── 피드백 ────────────────────────────────────────────────
+const FB_KEY = 'ai_librarian_feedback';
+
+function showFeedback() {
+  const wrap = document.getElementById('feedback-wrap');
+  wrap.style.display = 'block';
+  document.getElementById('feedback-thanks').style.display = 'none';
+  document.getElementById('feedback-thanks').textContent = '';
+  wrap.querySelectorAll('.fb-btn').forEach(b => {
+    b.disabled = false;
+    b.classList.remove('vote-good', 'vote-bad');
+  });
+}
+
+function hideFeedback() {
+  document.getElementById('feedback-wrap').style.display = 'none';
+}
+
+function submitFeedback(vote, btn) {
+  const query = document.getElementById('q-input').value.trim();
+  try {
+    const data = JSON.parse(localStorage.getItem(FB_KEY) || '[]');
+    data.unshift({ query, vote, ts: Date.now() });
+    localStorage.setItem(FB_KEY, JSON.stringify(data.slice(0, 300)));
+  } catch {}
+  document.getElementById('feedback-wrap').querySelectorAll('.fb-btn').forEach(b => b.disabled = true);
+  btn.classList.add(vote === 'good' ? 'vote-good' : 'vote-bad');
+  const thanks = document.getElementById('feedback-thanks');
+  thanks.textContent = vote === 'good'
+    ? '감사합니다! 도움이 됐다니 기쁩니다 😊'
+    : '피드백 감사합니다. 더 개선하겠습니다 🙏';
+  thanks.style.display = 'block';
+}
+
+function renderSuggestions(suggestions) {
+  document.getElementById('suggest-list').innerHTML = suggestions.map(s =>
+    `<button class="suggest-item" onclick='setHistQ(${JSON.stringify(s.question)})'>${esc(s.question)}</button>`
+  ).join('');
+}
+
+function toggleQA(i, head) {
+  const body = document.getElementById(`qa-body-${i}`);
+  const tog  = document.getElementById(`toggle-${i}`);
+  const open = body.classList.toggle('open');
+  tog.textContent = open ? '▲' : '▼';
+}
+
+function showCard(id, show) {
+  document.getElementById(id).style.display = show ? 'block' : 'none';
+}
+function setError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+function loadingHTML() { return ''; }
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('q-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) ask();
+});
+
+renderHistory();
+</script>
+
+</body>
+</html>
